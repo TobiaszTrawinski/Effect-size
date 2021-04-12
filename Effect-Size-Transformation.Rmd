@@ -39,6 +39,13 @@ In this post, we discuss (1)  how to obtain the effect size of the interaction b
 # load library
 library(tidyverse)
 library(afex)
+
+# load functions to convert pes and d
+devtools::source_gist("https://gist.github.com/HaiyangJin/3334e4d6588cbfe36b69c1bf2540c2ea")
+
+# usage:
+pes2d(.407, 20)
+d2pes(pes2d(.407, 20), 20)
 ```
 
 First, we simulated the database for the 2 X 2 within-subject design:
