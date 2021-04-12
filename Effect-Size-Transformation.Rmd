@@ -1,0 +1,276 @@
+---
+title: "Effect Size Transformation"
+author: 
+  - name: "Tobiasz Tranwinski"
+    affiliation : "1"
+    email: "tobiasz.tranwinski@nyu.edu"
+  - name: "[Haiyang Jin](https://haiyangjin.github.io/)"
+    affiliation: "1"
+    address: "New York University Abu Dhabi, Saadiyat Isalnd, Abu Dhabi, United Arab Emirates"
+    email: "haiyang.jin@nyu.edu"
+affiliation:
+  - id            : "1"
+    institution   : "New York Univesity Abu Dhabi"
+date: "`r format(Sys.time(), '%d-%m-%Y')`"
+output: 
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+version: "1.0"
+---
+
+<style>
+pre {
+overflow-x: auto;
+}
+pre code {
+word-wrap: normal;
+white-space: pre;
+}
+</style>
+
+We are currently working on the meta-analyze (link). The effect size of our main interest is the product of the interaction between two or three conditions. Unfortunately, many older papers do not report the effect size. 
+
+In this post, we discuss (1)  how to obtain the effect size of the interaction between two conditions and (2) propose the transformation of the partial eta squared to Cohen's d and then to Hedges' g.
+
+
+```{r include=FALSE}
+# load library
+library(tidyverse)
+library(afex)
+```
+
+First, we simulated the database for the 2 X 2 within-subject design:
+
+```{r}
+# simulate data
+set.seed(42)
+nSubj <- 20
+Subjects <-factor(rep(1:nSubj,each=4))  
+
+DV<-c(rnorm(nSubj, mean = 15, sd = 2), rnorm(nSubj, mean = 10, sd = 2))
+A <-rep(c("level1","level2"),each=2,20)
+B <-rep(c("level1","level2"),each=1,40)
+
+simu_long <-data.frame(Subjects,DV,A,B)
+head(simu_long)
+```
+
+The database has twenty participants. Each participant completed both conditions A (2: level1 vs. level2) and B (2: level1 vs. level2). There is eighty data points in total.
+
+# Analyzing Data: ANOVA
+
+To analyze data with a 2 X 2 within-subject design, we usually use ANOVA. To do so, we used package 'afex' (Singmann et al., 2021):
+. 
+
+```{r}
+ANOVAresults <-aov_4(DV ~ A*B+(A*B|Subjects), data = simu_long)
+nice(ANOVAresults, es = NULL, sig_symbols = rep("", 4))
+```
+
+
+# Effect size: partial eta-squared.  
+
+One of the most common measures of the effect size in psychology is partial eta squared. The partial eta squared formula is relatively simple:
+
+$$
+\begin{aligned}
+\eta_{p}^2 &= \frac{\mathrm{SS}_\mathrm{effect}}{\mathrm{SS}_\mathrm{effect}+\mathrm{SS}_\mathrm{error}}\\  
+\end{aligned}
+$$
+
+In many cases, psychological papers do not report SS-values, we also do not have access to the actual data. Fortunately, we can calculate partial eta squared from F-value and degrees of freedom (Lakens, 2013). 
+
+$$
+\begin{aligned}
+\eta_{p}^2 &= \frac{\mathrm{F*df}_\mathrm{num}}{\mathrm{F*df}_\mathrm{num}+\mathrm{df}_\mathrm{den}}\\
+\mathrm{df}_\mathrm{num} &= \mathrm{(k_A-1)*(k_B-1)}\\
+\mathrm{df}_\mathrm{den} &= \mathrm{N-(k_A*k_B)}\\
+\end{aligned}
+$$
+
+where F is the F-value, k_A and K_B reflects number of levels in condition A (i.e., 2) and in condition B (i.e., 2), N is the number of subjects (i.e., 20).
+
+Following this equation, partial eta squared for the interaction between condition A and B is: 
+
+```{r}
+n2p = 13.02*1/(13.02*1+19)
+n2p
+```
+
+which is the same as partial eta squared, which we have already gotten: 
+
+```{r}
+nice(ANOVAresults, es = 'pes', sig_symbols = rep("", 4))
+```
+
+
+# Effect size transformation 
+
+To conduct meta-analyses, it is necessary to combine effect sizes from different studies that used different metrics. To do so, we may normalize the effect sizes by transforming them into Hedges' g (Hedges & Olkin, 1985).
+
+## Converting partial eta-squared to eta-squared
+
+First, we can try to transform partial eta squared to eta squared. Next transform eta squared into Cohen's d and finally, transform Cohen's d to Hedges' g using the 'esc' R package (Lüdecke, 2019). 
+
+We know the following (Pearson, 1911): 
+
+
+$$
+\begin{aligned}
+\eta_{p}^2 &= \eta^2
+\end{aligned}
+$$
+
+Note, that only in the case of the simple design (e.g., one-way ANOVA) the following formula is true. In our case, we are interested in the transformation of the effect size for the interaction between condition A X B. The formula for the eta squared is (e.g., Cohen, 1973, 1988; Fisher, 1925, 1973):
+
+$$
+\begin{aligned}
+\eta^2 &= \frac{\mathrm{SS}_\mathrm{effect}}{\mathrm{SS}_\mathrm{total}}\\
+\end{aligned}
+$$
+
+Alternatively, Kennedy (1970) proposed:
+
+$$
+\begin{aligned}
+\eta^2 &= \frac{\mathrm{n}_\mathrm{1}F}{\mathrm{n}_\mathrm{1}F + \mathrm{n}_\mathrm{2}}\\
+\end{aligned}
+$$
+
+which could be simplified to: 
+
+$$
+\begin{aligned}
+\eta^2 &= \frac{\mathrm{SS}_\mathrm{effect}}{\mathrm{SS}_\mathrm{effect}+\mathrm{SS}_\mathrm{error}}\\  
+\end{aligned}
+$$
+
+However, Cohen (1973) pointed out that this formula represents partial eta squared, not the actual eta squared. 
+
+Taken together, we do not know the way how to convert the eta-squared to partial eta-squared given the information usually provided in the paper. 
+
+We now are going to consider an alternative approach.
+
+## Converting partial eta-squared to Cohen's d
+
+Let's take the Cohen's d from the following formula:
+
+$$
+\begin{aligned}
+\eta_{p}^2 &= \frac{\ d^2 * N}{\ d^2 * N + N\mathrm{-1}}\\
+\end{aligned}
+$$
+
+After transformations (see more details here: https://haiyangjin.github.io/2020/05/eta2d/) we can get Cohen's d.
+
+$$
+\begin{aligned}
+\ d = \sqrt[](\frac{(\mathrm{N - 1})}{\mathrm{N}} * \frac{\eta_{p}^2}{(1-\eta_{p}^2)})\\
+\end{aligned}
+$$
+
+We now consider a set of values that we got from our ANOVA analyses for the simulated dataset. 
+
+```{r}
+nice(ANOVAresults, es = 'pes', sig_symbols = rep("", 4))
+CohenD <- sqrt((nSubj-1)/nSubj*.407/(1-.407))
+CohenD 
+```
+
+Cohen's d is equal to 0.8074798. Let's check if this calculation is correct. 
+
+$$
+\begin{aligned}
+\ t &= \ d * \sqrt[]{N} \\
+\end{aligned}
+$$
+```{r}
+tvalue <- CohenD *sqrt(nSubj)
+tvalue
+```
+
+$$
+\begin{aligned}
+\ F &= \ t^2\\
+\end{aligned}
+$$
+```{r}
+Fvalue <- tvalue*tvalue
+Fvalue
+nice(ANOVAresults, es = 'pes', sig_symbols = rep("", 4))
+```
+
+The F-value is similar to the F-value presented in the ANOVA table!
+
+## Converting Cohen's d to Hedges' g. 
+
+To transform Cohen's d to Hedges' g, we used mentioned above 'esc' package. 
+
+```{r echo=FALSE}
+library('esc')
+hedges_g(CohenD, totaln = 20)
+```
+
+
+# Example
+
+In the part-whole task, Tanaka et al. (2004) provided information about significant two-way interaction between Test Type (2: part vs whole) and Race of Target Face (Caucasian faces vs Asian faces) on accuracy for Caucasian (n = 21, F(1,20) = 18.436, MS = .056, p <.001) but not Asian (n = 21, F(1,20) = .073, MS = .001, p >.10) participants.
+
+```{r}
+nSubjC <- 21 # Number of Caucasian participants
+nSubjA <- 21 # Number of Asian participants
+
+# Partial eta-squared 
+n2pA <- .073*1/(.073*1+20)
+n2pC <- 18.436*1/(18.436*1+20) 
+
+CohenD_A <- sqrt((nSubjA -1)/nSubjA *n2pA/(1-n2pA))
+CohenD_A
+gA <- hedges_g(CohenD_A, totaln = nSubjA)
+gA
+
+CohenD_C <- sqrt((nSubjC-1)/nSubjC*n2pC/(1-n2pC))
+CohenD_C
+gC<- hedges_g(CohenD_C, totaln = nSubjC)
+gC
+```
+
+The Hedges' g for the interaction between Test Type and Race of Target Face was 0.057 and 0.899 for Asian and Caucasian participants, respectively. 
+
+
+# Some words at the end
+
+We cannot guarantee that these conversions are applicable in all situations, but at least they work well for cases similar to the simulated data.
+
+Additionally, we really appreciate if you could let us know if there is any error in this post.
+
+# References
+
+Cohen, J. (1973). Eta-squared and partial eta-squared in fixed factor ANOVA designs. Educational and Psychological Measurement, 33(1), 107-112.
+
+Cohen, J. (1988). Statistical power analysis for the behavioral sciences (2nd ed.). Hillsdale, NJ: Erlbaum.
+
+Fisher, R.A. (1925). Statistical methods for research workers. Edinburgh: Oliver & Boyd.
+
+Fisher, R. A. (1973). Statistical methods for research workers (14th ed.). New York: Hafner.
+
+Hedges, L., & Olkin, I. (1985). Statistical Methods for Meta-analysis. San Diego, CA: Academic Press.
+
+Kennedy, J. J. (1970). The eta coefficient in complex ANOVA designs. Educational and Psychological Measurement, 30(4), 885-889.
+
+Lakens, D. (2013). Calculating and reporting effect sizes to facilitate cumulative science: a practical primer for t-tests and ANOVAs. Frontiers in psychology, 4, 863.
+
+Pearson, K. (1911). On a correction needful in the case of the correlation ratio. Biometrika, 8, 254–256.
+
+Tanaka, J. W., Kiefer, M., & Bukach, C. M. (2004). A holistic account of the own-race effect in face recognition: Evidence from a cross-cultural study. Cognition, 93(1), B1-B9.'
+
+
+`citation('afex')`
+
+`citation('esc')`
+
+`citation('tidyverse')`
+
+
